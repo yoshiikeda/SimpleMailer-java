@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.nio.charset.*;
 import java.time.*;
 import java.time.format.*;
 import java.util.*;
@@ -20,6 +21,8 @@ public class SimpleMailer
 
     private static final String EMAIL_SERVER_NAME_DEFAULT = "localhost";
     private static final int EMAIL_SERVER_PORT_DEFAULT = 25;
+
+    private static final Charset CHARSET_DEFAULT = Charset.forName("UTF-8");
 
     private static final Map<String, String> SERVER_RESPONSES = Stream.of(new String[][] { { "Start", "220 " },
                                                                                            { "OK", "250 " },
@@ -81,20 +84,25 @@ public class SimpleMailer
                                                  UnknownHostException,
                                                  SimpleMailerError
     {
-        try (Socket SOCKET = new Socket(server_name_, server_port_);
-             InputStreamReader INSTREAM = new InputStreamReader(SOCKET.getInputStream());
-             BufferedReader READER = new BufferedReader(INSTREAM);
-             PrintWriter WRITER = new PrintWriter(SOCKET.getOutputStream(), true))
+        try (final Socket SOCKET = new Socket(server_name_, server_port_);
+             final InputStreamReader INSTREAM = new InputStreamReader(SOCKET.getInputStream());
+             final BufferedReader READER = new BufferedReader(INSTREAM);
+             final OutputStreamWriter WRITER = new OutputStreamWriter(SOCKET.getOutputStream(),
+                                                                      CHARSET_DEFAULT);
+             final PrintWriter PRINTER = new PrintWriter(WRITER, true))
         {
-            Communicate(WRITER, READER, null, "Start");
+            Communicate(PRINTER,
+                        READER,
+                        null,
+                        "Start");
 
-            Communicate(WRITER,
+            Communicate(PRINTER,
                         READER,
                         CLIENT_COMMANDS.get("Start")
                                        .replace("{0}", server_name_),
                         "OK");
 
-            Communicate(WRITER,
+            Communicate(PRINTER,
                         READER,
                         CLIENT_COMMANDS.get("Sender")
                                        .replace("{0}", sender_),
@@ -102,19 +110,19 @@ public class SimpleMailer
 
             for (String RECIPIENT : recipients_)
             {
-                Communicate(WRITER,
+                Communicate(PRINTER,
                             READER,
                             CLIENT_COMMANDS.get("Recipient")
                                            .replace("{0}", RECIPIENT),
                             "OK");
             }
 
-            Communicate(WRITER,
+            Communicate(PRINTER,
                         READER,
                         CLIENT_COMMANDS.get("Data"),
                         "Data");
 
-            Communicate(WRITER,
+            Communicate(PRINTER,
                         READER,
                         CLIENT_COMMANDS.get("Body")
                                        .replace("{0}", Message(sender_,
@@ -123,7 +131,7 @@ public class SimpleMailer
                                                                body_)),
                         "OK");
 
-            Communicate(WRITER,
+            Communicate(PRINTER,
                         READER,
                         CLIENT_COMMANDS.get("Quit"),
                         "End");
@@ -146,7 +154,7 @@ public class SimpleMailer
             writer_.println(call_);
         }
 
-        String RESPONSE = reader_.readLine();
+        final String RESPONSE = reader_.readLine();
 
         if (!RESPONSE.startsWith(SERVER_RESPONSES.get(response_)))
         {
@@ -160,37 +168,37 @@ public class SimpleMailer
                                   String subject_,
                                   String body_)
     {
-        StringBuilder result = new StringBuilder();
+        final StringBuilder RESULT = new StringBuilder();
 
-        String SEPARATOR = System.lineSeparator();
+        final String SEPARATOR = System.lineSeparator();
 
-        result.append(EMAIL_COMPONENTS.get("From")
+        RESULT.append(EMAIL_COMPONENTS.get("From")
                                       .replace("{From}", sender_))
               .append(SEPARATOR);
               
         for (String RECIPIENT : recipients_)
         {
-            result.append(EMAIL_COMPONENTS.get("To")
+            RESULT.append(EMAIL_COMPONENTS.get("To")
                                           .replace("{To}", RECIPIENT))
                   .append(SEPARATOR);
         }
 
-        result.append(EMAIL_COMPONENTS.get("Date")
+        RESULT.append(EMAIL_COMPONENTS.get("Date")
                                       .replace("{Date}",
                                                ZonedDateTime.now()
                                                             .format(DateTimeFormatter.RFC_1123_DATE_TIME)))
               .append(SEPARATOR);
 
-        result.append(EMAIL_COMPONENTS.get("Subject")
+        RESULT.append(EMAIL_COMPONENTS.get("Subject")
                                       .replace("{Subject}", subject_))
               .append(SEPARATOR);
 
-        result.append(EMAIL_COMPONENTS.get("Body")
+        RESULT.append(EMAIL_COMPONENTS.get("Body")
                                       .replace("{Body}", body_))
               .append(SEPARATOR);
 
-        result.append(EMAIL_COMPONENTS.get("EOM"));
+        RESULT.append(EMAIL_COMPONENTS.get("EOM"));
 
-        return result.toString();
+        return RESULT.toString();
     }
 }
